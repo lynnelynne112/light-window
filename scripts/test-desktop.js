@@ -1,0 +1,13 @@
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const root = path.resolve(__dirname, '..');
+const report = path.join(root,'qa','electron-self-test.json');
+const started = Date.now();
+const run = spawnSync(require('electron'),[root,'--self-test',...process.argv.slice(2)],{cwd:root,windowsHide:true,timeout:60000,stdio:'inherit'});
+if (run.error) throw run.error;
+if (!fs.existsSync(report) || fs.statSync(report).mtimeMs < started) throw new Error('No fresh desktop test report.');
+const result = JSON.parse(fs.readFileSync(report,'utf8'));
+if (run.status !== 0 || !result.success) throw new Error(result.error || 'Desktop tests failed.');
+console.log(JSON.stringify({success:true,checks:result.checks.length,report}));

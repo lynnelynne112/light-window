@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.cache/
+.qa-profile/
+.qa-reports/
+data/
+qa-electron-data/
+qa/
+**/data/
+**/browser/
+**/Cookies*
+**/Local State
+**/settings.json
+**/sites.json
+.env
+.env.*
+*.log
+*.zip
+*.exe
+*.dll
+*.pak
+*.asar
+__pycache__/
+.DS_Store
+Thumbs.db
