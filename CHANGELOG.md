@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.3
+
+- Make isolated packaged profile fixtures compatible with the supported Node.js 24 build environment.
+
 ## 3.0.2
 
 - Initialize the isolated regression workspace on clean checkouts so GitHub can verify packaged login persistence before publishing.
