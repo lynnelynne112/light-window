@@ -6,6 +6,6 @@ Only HTTP/HTTPS addresses may be saved or opened through the address field. Cred
 
 Camera, microphone, location and other extra site permissions are denied by default. The app has no updater, telemetry service, remote debugging port or upload service.
 
-`data/` can contain sensitive login state and personal URLs. Do not attach it to bug reports. Build and source exports deliberately exclude this directory and generated test profiles. Close the app before manually backing up or moving local browser data.
+The Windows release stores sensitive login state and personal URLs under `%APPDATA%\LightWindow\data`; development uses the project's ignored `data/`. Do not attach these directories to bug reports. Build and source exports deliberately exclude browser data and generated test profiles. Legacy migrations copy the complete profile, including its existing local encryption state, only after the old process has closed. Original files are retained. Close the app before manually backing up or moving local browser data.
 
 Report a potential security issue through the repository's private security advisory feature if the owner enables it. Do not publish tokens, passwords, browser databases, or private URLs in public issues. Keep Electron updated and review the [official Electron security guidance](https://www.electronjs.org/docs/latest/tutorial/security) when changing navigation or IPC behavior.

@@ -1,6 +1,7 @@
 'use strict';let current;
 function render(s){
   current=s;
+  document.title='轻窗 v'+s.version;
   const mode=document.querySelector('#mode');mode.textContent=s.hover?'移入 · 开':'始终显示';mode.dataset.short=s.hover?'移入':'常显';mode.classList.toggle('on',s.hover);mode.setAttribute('aria-pressed',String(s.hover));mode.setAttribute('aria-label',s.hover?'移入显示已开启，点击切换始终显示':'始终显示，点击开启移入显示');
   document.querySelector('#menu-mode').textContent=s.hover?'关闭移入显示':'开启移入显示';
   document.querySelector('#frame').textContent=s.chromeHidden?'有框':'无框';document.querySelector('#frame').title=s.chromeHidden?'恢复工具栏与边框':'隐藏工具栏与边框，只留网页';

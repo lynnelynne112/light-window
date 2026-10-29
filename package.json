@@ -1,7 +1,7 @@
 {
   "name": "light-window",
   "productName": "轻窗",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "A small Windows web window with whole-window opacity, hover reveal, and saved websites.",
   "license": "UNLICENSED",
   "private": true,
@@ -14,7 +14,8 @@
     "test": "node --test test/*.test.js",
     "test:desktop": "node scripts/test-desktop.js",
     "package:win": "node scripts/package-win.js",
-    "check:source": "node scripts/check-source.js"
+    "check:source": "node scripts/check-source.js",
+    "test:profile": "node scripts/test-profile.js"
   },
   "devDependencies": {
     "electron": "45.1.0"

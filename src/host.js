@@ -1,22 +1,34 @@
 'use strict';
-const { app, BrowserWindow, WebContentsView, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, dialog } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { preferences, fromLegacy, contains, clamp, HoverController, chromeLayout } = require('./core');
 const { DEFAULT_SITE, normalizeURL, normalizeSiteState, saveSite, removeSite, partitionForURL } = require('./sites');
+const { resolveProfileDirectory } = require('./profile');
 const SELF = process.argv.includes('--self-test');
 const LIVE = process.argv.includes('--live-check');
-const QA = SELF || LIVE;
+const PROFILE_TEST = process.argv.find(arg=>arg.startsWith('--profile-check='))?.split('=')[1];
+const QA = SELF || LIVE || Boolean(PROFILE_TEST);
 const ROOT = process.defaultApp ? path.resolve(__dirname, '..') : path.dirname(process.execPath);
-const DATA = path.join(ROOT, QA ? 'qa-electron-data' : 'data');
-const REPORT = path.join(ROOT, 'qa');
+function requireLegacyClosed(legacy){
+  const executable=path.join(path.dirname(legacy),'electron.exe');if(process.platform!=='win32'||!fs.existsSync(executable))return;
+  const code='@(Get-CimInstance Win32_Process -Filter "Name=\'electron.exe\'" | Where-Object { $_.ProcessId -ne [int]$env:LW_MIGRATION_PID -and $_.ExecutablePath -eq $env:LW_MIGRATION_EXE -and $_.CommandLine -notmatch "--type=" }).Count';
+  let count;try{count=Number(require('node:child_process').execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',code],{encoding:'utf8',windowsHide:true,timeout:10000,env:{...process.env,LW_MIGRATION_PID:String(process.pid),LW_MIGRATION_EXE:executable}}).trim());}catch{throw new Error('无法确认旧版是否已退出，登录资料尚未迁移。请关闭旧版后重试。');}
+  if(!Number.isFinite(count)||count>0)throw new Error('旧版轻窗仍在运行。请先退出旧版再打开新版，登录资料尚未迁移。');
+}
+let profile;
+try{profile=resolveProfileDirectory({installDir:PROFILE_TEST?process.env.LW_TEST_INSTALL_DIR||ROOT:ROOT,appDataDir:PROFILE_TEST?process.env.LW_TEST_APPDATA:app.getPath('appData'),development:Boolean(process.defaultApp)&&!PROFILE_TEST,qaDirectory:PROFILE_TEST==='seed'?path.join(process.env.LW_TEST_INSTALL_DIR||ROOT,'data'):SELF||LIVE?path.join(ROOT,'qa-electron-data'):undefined,beforeMigration:requireLegacyClosed});}
+catch(error){dialog.showErrorBox('轻窗无法打开登录资料',error.message);app.exit(1);throw error;}
+const DATA = profile.directory;
+const REPORT = QA?path.join(ROOT,'qa'):path.join(DATA,'diagnostics');
 const HOME = DEFAULT_SITE.url;
-const VERSION = '3.0.0';
+const VERSION = '3.0.1';
 const ICON = [path.join(ROOT,'app.ico'),path.join(ROOT,'assets','icon.ico'),path.join(ROOT,'LightFenbi.ico')].find(p=>fs.existsSync(p));
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(REPORT, { recursive: true });
 app.setName('轻窗');
 app.setPath('userData', path.join(DATA, 'browser'));
+app.setPath('sessionData',path.join(DATA,'browser'));
 app.setAppUserModelId('LightFenbi.Personal');
 let ui;
 const now = () => performance.now();
@@ -41,7 +53,7 @@ class FenbiApp {
     this.sitesFile=path.join(DATA,'sites.json');
     this.siteState=normalizeSiteState(read(this.sitesFile,null));
     if(SELF&&this.siteState.sites.some(site=>site.id==='fenbi'))this.siteState.activeId='fenbi';
-    this.siteViews=new Map();this.siteViews.set(this.siteState.activeId,[]);
+    this.siteViews=new Map();this.siteViews.set(this.siteState.activeId,[]);this.browserSessions=new Set();
     this.trusted=new Set(); this.status='正在准备网页…'; this.pointer=null;
     this.controlsOpen=false;this.sitesOpen=false; this.shutting=false; this.tray=null; this.trace=[];
     const area=screen.getPrimaryDisplay().workArea;
@@ -58,7 +70,7 @@ class FenbiApp {
     this.main.setAlwaysOnTop(!QA && this.prefs.topmost);
     this.main.on('resize',()=>{const [w,h]=this.main.getContentSize();if(w<140||h<100)this.controlsOpen=false;this.layout();this.broadcast();this.saveSoon();});
     this.main.on('move',()=>this.saveSoon());
-    this.main.on('close',()=>{this.shutting=true;this.save();});
+    this.main.on('close',event=>{if(!this.readyToClose){event.preventDefault();this.requestQuit();}else{this.shutting=true;this.save();}});
     this.main.on('closed',()=>this.shutdown());
     this.main.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     this.main.webContents.on('will-navigate',e=>e.preventDefault());
@@ -77,8 +89,8 @@ class FenbiApp {
   current() { return this.views.at(-1); }
   activeSite(){return this.siteState.sites.find(site=>site.id===this.siteState.activeId);}
   geometry() { const [w,h]=this.main.getContentSize();return chromeLayout(w,h,this.prefs.chromeHidden,this.controlsOpen||this.sitesOpen,this.sitesOpen); }
-  snapshot() { return {...this.prefs,controlsOpen:this.controlsOpen,sitesOpen:this.sitesOpen,sites:this.siteState.sites,activeSiteId:this.siteState.activeId,activeSiteName:this.activeSite().name,layout:this.geometry(),status:this.status,tabs:this.views.length,url:this.current()?.webContents.getURL()||this.activeSite().url,version:VERSION}; }
-  broadcast() { if(this.main.isDestroyed())return;for(const id of this.trusted) { const wc=require('electron').webContents.fromId(id); if(wc&&!wc.isDestroyed())wc.send('lf:state',this.snapshot()); } }
+  snapshot() { const current=this.current()?.webContents;return {...this.prefs,controlsOpen:this.controlsOpen,sitesOpen:this.sitesOpen,sites:this.siteState.sites,activeSiteId:this.siteState.activeId,activeSiteName:this.activeSite().name,layout:this.geometry(),status:this.status,tabs:this.views.length,url:current&&!current.isDestroyed()?current.getURL()||this.activeSite().url:this.activeSite().url,version:VERSION}; }
+  broadcast() { if(this.main.isDestroyed()||this.shutting)return;for(const id of this.trusted) { const wc=require('electron').webContents.fromId(id); if(wc&&!wc.isDestroyed())wc.send('lf:state',this.snapshot()); } }
   saveSoon() { clearTimeout(this.saveTimer); this.saveTimer=setTimeout(()=>this.save(),200); }
   save() { if(!QA && !this.main.isDestroyed() && !this.main.isMinimized())this.prefs.bounds=this.main.getBounds(); atomic(this.file,this.prefs); }
   saveSites(){atomic(this.sitesFile,this.siteState);}
@@ -161,6 +173,7 @@ class FenbiApp {
     const webPreferences={sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,allowRunningInsecureContent:false,partition:partitionForURL(site.url)};
     if(Number.isInteger(options.webPreferences?.openerId))webPreferences.openerId=options.webPreferences.openerId;
     const v=new WebContentsView({...options,webPreferences});
+    this.browserSessions.add(v.webContents.session);
     v.siteId=siteId;
     for(const old of group)old.setVisible(false);
     group.push(v);this.main.contentView.addChildView(v);v.setVisible(siteId===this.siteState.activeId);
@@ -271,19 +284,48 @@ class FenbiApp {
   }
   shutdown() {
     if(this.stopped)return;this.stopped=true;this.shutting=true;clearInterval(this.timer);clearTimeout(this.saveTimer);
-    for(const v of this.allViews())if(!v.webContents.isDestroyed())v.webContents.close({waitForBeforeUnload:false});
-    if(this.corner&&!this.corner.webContents.isDestroyed())this.corner.webContents.close({waitForBeforeUnload:false});
+    for(const v of this.allViews())if(v.webContents&&!v.webContents.isDestroyed())v.webContents.close({waitForBeforeUnload:false});
+    if(this.corner?.webContents&&!this.corner.webContents.isDestroyed())this.corner.webContents.close({waitForBeforeUnload:false});
     this.tray?.destroy();globalShortcut.unregisterAll();
-    if(!QA)app.quit();
+    if(!QA||PROFILE_TEST)app.quit();
+  }
+  async flushBrowserData(){
+    await Promise.all([...this.browserSessions].map(async session=>{session.flushStorageData();await session.cookies.flushStore();}));
+  }
+  requestQuit(){
+    if(this.quitPromise)return this.quitPromise;
+    this.shutting=true;clearInterval(this.timer);clearTimeout(this.saveTimer);
+    if(!this.main.isDestroyed()){this.save();this.saveSites();this.main.hide();}
+    this.quitPromise=(async()=>{
+      await this.flushBrowserData();
+      await Promise.all(this.allViews().map(view=>new Promise(resolve=>{
+        const wc=view.webContents;if(!wc||wc.isDestroyed())return resolve();
+        const timeout=setTimeout(resolve,3000);wc.once('destroyed',()=>{clearTimeout(timeout);resolve();});wc.close({waitForBeforeUnload:false});
+      })));
+      await this.flushBrowserData();
+      this.readyToClose=true;
+      if(this.main.isDestroyed())app.quit();else this.main.close();
+    })().catch(error=>{
+      reportError(error);this.quitPromise=null;this.shutting=false;
+      if(!this.main.isDestroyed()){
+        this.status='登录资料保存失败，请稍后再退出';
+        if(!this.current()?.webContents||this.current().webContents.isDestroyed()){this.siteViews.set(this.siteState.activeId,[]);this.addView();this.load(this.activeSite().url);}
+        this.controller.restore(now());this.timer=setInterval(()=>this.tick(),16);this.broadcast();
+      }
+    });
+    return this.quitPromise;
   }
 }
 
 ipcMain.handle('lf:state',event=>{if(!ui?.trusted.has(event.sender.id))throw new Error('Untrusted sender');return ui.snapshot();});
 ipcMain.handle('lf:action',(event,{name,value})=>{if(!ui?.trusted.has(event.sender.id))throw new Error('Untrusted sender');return ui.action(name,value);});
+app.on('before-quit',event=>{if(ui&&!ui.readyToClose&&(!QA||PROFILE_TEST)){event.preventDefault();ui.requestQuit();}});
+app.on('window-all-closed',()=>{if(ui&&(!QA||PROFILE_TEST))ui.requestQuit();});
 app.whenReady().then(async()=>{
   if(!app.requestSingleInstanceLock()){app.quit();return;}
   app.on('second-instance',()=>ui?.controller.restore(now()));
   ui=new FenbiApp();await ui.create();
-  if(SELF)await require('./selftest').run({ui,app,fs,path,ROOT,DATA,REPORT,now,atomic});
+  if(PROFILE_TEST)await require('./profile-selftest').run({ui,app,fs,path,ROOT,DATA,REPORT,atomic,profile,phase:PROFILE_TEST});
+  else if(SELF)await require('./selftest').run({ui,app,fs,path,ROOT,DATA,REPORT,now,atomic});
   else if(LIVE)await require('./selftest').live({ui,app,fs,path,ROOT,DATA,REPORT,now,atomic,HOME});
 }).catch(reportError);

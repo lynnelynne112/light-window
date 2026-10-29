@@ -20,6 +20,7 @@ jobs:
       - run: npm test
       - run: npm run check:source
       - run: npm run package:win
+      - run: npm run test:profile -- --packaged
       - uses: actions/upload-artifact@v7
         with:
           name: LightWindow-Windows-x64

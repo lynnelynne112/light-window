@@ -12,6 +12,7 @@ qa/
 **/Local State
 **/settings.json
 **/sites.json
+**/.profile-location.json
 .env
 .env.*
 *.log

@@ -24,6 +24,7 @@ jobs:
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and package versions differ' }
       - run: npm run package:win
+      - run: npm run test:profile -- --packaged
       - name: Publish portable ZIP
         shell: pwsh
         env:

@@ -4,7 +4,7 @@ const http=require('node:http');
 const { BrowserWindow }=require('electron');
 const { HoverController,preferences,fromLegacy,contains }=require('./core');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function until(predicate,ms=3000){const end=performance.now()+ms;while(!predicate()){if(performance.now()>end)throw new Error('Test condition timed out');await sleep(10);}}
+async function until(predicate,ms=3000){const end=performance.now()+ms;while(!await predicate()){if(performance.now()>end)throw new Error('Test condition timed out');await sleep(10);}}
 function domainTests(checks){
   let visible=true,alpha=0;
   const regions=[{x:0,y:0,width:500,height:500}];
@@ -187,6 +187,7 @@ exports.run=async function(ctx){
     ui.change('chromeHidden',false);await ui.action('close-settings');
     for(const [width,height] of [[440,300],[360,240],[280,180],[180,120],[120,90],[80,60]]){
       ui.main.setSize(width,height);await sleep(100);
+      await until(async()=>{const header=await ui.main.webContents.executeJavaScript('document.querySelector("#chromeRegion").getBoundingClientRect().height');return Math.abs(header-ui.geometry().header)<.5&&ui.current().getBounds().y===ui.geometry().header;});
       const layout=await ui.main.webContents.executeJavaScript(`(()=>{
         const top=document.querySelector('.top').getBoundingClientRect();
         const controls=[...document.querySelectorAll('.top button,.top input,.top output')].filter(el=>el.getBoundingClientRect().width>0);
