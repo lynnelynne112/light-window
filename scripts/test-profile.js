@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const root=path.resolve(__dirname,'..');const testRoot=fs.mkdtempSync(path.join(root,'qa','profile-upgrade-'));
+const root=path.resolve(__dirname,'..');fs.mkdirSync(path.join(root,'qa'),{recursive:true});const testRoot=fs.mkdtempSync(path.join(root,'qa','profile-upgrade-'));
 const a=path.join(testRoot,'LightWindow-3.0.0-win32-x64'),b=path.join(testRoot,'LightWindow-3.0.1-win32-x64'),user=path.join(testRoot,'user');fs.mkdirSync(a);fs.mkdirSync(b);
 const packaged=process.argv.includes('--packaged');
 if(packaged){const built=path.join(root,'dist','LightWindow-'+require('../package.json').version+'-win32-x64');fs.cpSync(built,a,{recursive:true,errorOnExist:true,force:false});fs.cpSync(built,b,{recursive:true,errorOnExist:true,force:false});}

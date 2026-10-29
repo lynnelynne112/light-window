@@ -22,7 +22,7 @@ catch(error){dialog.showErrorBox('轻窗无法打开登录资料',error.message)
 const DATA = profile.directory;
 const REPORT = QA?path.join(ROOT,'qa'):path.join(DATA,'diagnostics');
 const HOME = DEFAULT_SITE.url;
-const VERSION = '3.0.1';
+const VERSION = '3.0.2';
 const ICON = [path.join(ROOT,'app.ico'),path.join(ROOT,'assets','icon.ico'),path.join(ROOT,'LightFenbi.ico')].find(p=>fs.existsSync(p));
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(REPORT, { recursive: true });

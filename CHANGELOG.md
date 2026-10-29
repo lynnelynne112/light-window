@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.2
+
+- Initialize the isolated regression workspace on clean checkouts so GitHub can verify packaged login persistence before publishing.
+
 ## 3.0.1
 
 - Store Windows release profiles in one shared per-user directory, so extracting an update elsewhere retains login data.
