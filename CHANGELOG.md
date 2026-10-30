@@ -1,24 +1,27 @@
-# Changelog
+# 更新记录
 
 ## 3.0.3
 
-- Make isolated packaged profile fixtures compatible with the supported Node.js 24 build environment.
+- 升级后使用固定的本机资料目录，换一个解压位置也能继续使用原来的登录资料。
+- 从旧版迁移时保留原资料；找到多份或复制不完整时会提示，不会直接覆盖。
+- 退出前等待所有已打开网站保存登录资料，包括后台的网站。
+- 修复打包测试在 Node.js 24 下的问题，发布前验证两份程序目录之间的登录延续。
+
+旧版升级步骤见[升级说明](docs/UPGRADING.md)。
 
 ## 3.0.2
 
-- Initialize the isolated regression workspace on clean checkouts so GitHub can verify packaged login persistence before publishing.
+- 修复 GitHub 构建时测试目录未初始化的问题。
 
 ## 3.0.1
 
-- Store Windows release profiles in one shared per-user directory, so extracting an update elsewhere retains login data.
-- Copy compatible legacy data without deleting the original, and refuse ambiguous or incomplete migrations.
-- Wait for every opened site's cookie and DOM storage writes before normal exit, including background sites and final page shutdown.
-- Add process-restart and two-install-directory login regression tests, including explicit logout.
+- 将 Windows 登录资料改为固定存储，并加入旧资料迁移。
+- 调整正常退出流程，等待 Cookie 和本地存储保存完成。
+- 加入真实进程重启、跨目录升级和主动注销测试。
 
 ## 3.0.0
 
-- Generalize the Fenbi-only window into a saved website library.
-- Add website creation, editing, removal, switching, and current-page bookmarks.
-- Preserve live background pages and isolate storage by origin while retaining the legacy Fenbi partition.
-- Retain responsive controls, whole-window opacity, hover reveal, small frameless controls, hidden taskbar button, and unconstrained resizing.
-- Add reproducible npm dependencies, unit tests, desktop regression tests, portable packaging, and GitHub Actions.
+- 支持添加、编辑、删除和切换网站，也可以收藏当前页。
+- 切换网站时保留已打开的页面，沿用原来的粉笔登录分区。
+- 保留整体透明度、移入显示、隐藏边框、窗口缩放和小窗口菜单。
+- 加入自动测试、Windows 便携包构建和 GitHub 发布流程。
